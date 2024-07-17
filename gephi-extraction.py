@@ -58,6 +58,9 @@ def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, im
   # additionally only keep the columns we are interested in
   # We have to use the operator '|' instead of 'or', because the latter is for boolean operations in Pandas
   relevantNodesDf = dfOrgs.loc[ (dfOrgs['contributorID'].isin(edgeDf['Source'])) | (dfOrgs['contributorID'].isin(edgeDf['Target'])), columnsToKeep]
+
+  # default Gephi column names for node ID and label https://github.com/kbrbe/beltrans-gephi-extraction/issues/5
+  relevantNodesDf.rename(columns={'contributorID': 'Id', 'name': 'Label'}, inplace=True)
   relevantNodesDf.to_csv(nodeListFilename, index=False)
 
   # for now the country of the publisher record (not always filled in)
