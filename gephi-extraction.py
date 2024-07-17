@@ -41,19 +41,24 @@ def main():
   # store the mapping in a separate data structure so we can reuse it
   imprintMapping = dfOrgs[['contributorID', 'isImprintFrom']].copy()
 
-  # no imprintMapping needed for the following function, because the mapping information is already in dfOrgs
-  createNodeList(dfOrgs, nodeListFilename, considerImprintRelation, imprintMappingExceptions)
-
   # create edge list with information from the nodes (needed for correct mapping of imprints)
-  createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions)
+  # we first have to create edges, because based on them we have to filter nodes afterwards
+  edgeDf = createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions)
 
+  # no imprintMapping needed for the following function, because the mapping information is already in dfOrgs
+  createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, imprintMappingExceptions)
 
 
 # -----------------------------------------------------------------------------
-def createNodeList(dfOrgs, nodeListFilename, considerImprintRelation, imprintMappingExceptions):
+def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, imprintMappingExceptions):
 
   columnsToKeep = ['contributorID', 'name', 'country']
-  dfOrgs[columnsToKeep].to_csv(nodeListFilename, index=False)
+
+  # only select nodes that exist in the edges https://github.com/kbrbe/beltrans-gephi-extraction/issues/3
+  # additionally only keep the columns we are interested in
+  # We have to use the operator '|' instead of 'or', because the latter is for boolean operations in Pandas
+  relevantNodesDf = dfOrgs.loc[ (dfOrgs['contributorID'].isin(edgeDf['Source'])) | (dfOrgs['contributorID'].isin(edgeDf['Target'])), columnsToKeep]
+  relevantNodesDf.to_csv(nodeListFilename, index=False)
 
   # for now the country of the publisher record (not always filled in)
   #
@@ -110,6 +115,8 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
   outputEdgeDf.rename(columns={'sourceID': 'Source', 'targetID': 'Target'}, inplace=True)
   outputEdgeDf['Type'] = 'directed'
   outputEdgeDf.to_csv(edgeListFilename, index=False)
+
+  return outputEdgeDf
 
 
 # -----------------------------------------------------------------------------
