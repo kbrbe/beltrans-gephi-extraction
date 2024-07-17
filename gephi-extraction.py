@@ -77,7 +77,7 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
 
   sourceTargetColumns = ['sourcePublisherIdentifiers', 'targetPublisherIdentifiers']
   genreColumn = 'targetThesaurusBB'
-  additionalInfoColumns = ['targetYearOfPublication']
+  additionalInfoColumns = ['targetYearOfPublication', 'sourceLanguage', 'targetLanguage']
 
 
   # We want one row = one source-target relation
@@ -114,6 +114,10 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
   # Ensure we only write "real" edges to the output: edges with target AND source
   outputEdgeDf = edgeDf.loc[(edgeDf['sourceID'] != '') & (edgeDf['targetID'] != ''),['sourceID','targetID'] + additionalInfoColumns]
 
+  # add edge list attribute for translation flow https://github.com/kbrbe/beltrans-gephi-extraction/issues/2
+  outputEdgeDf['translationFlow'] = outputEdgeDf.apply(determineTranslationFlow, axis=1)
+  outputEdgeDf.drop(columns=['sourceLanguage', 'targetLanguage'], inplace=True)
+
   # default Gephi column names for source and target https://github.com/kbrbe/beltrans-gephi-extraction/issues/5
   outputEdgeDf.rename(columns={'sourceID': 'Source', 'targetID': 'Target'}, inplace=True)
   outputEdgeDf['Type'] = 'directed'
@@ -121,6 +125,16 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
 
   return outputEdgeDf
 
+
+# -----------------------------------------------------------------------------
+def determineTranslationFlow(row):
+
+  if 'French' in row['sourceLanguage'] and 'Dutch' in row['targetLanguage']:
+    return 'FR-NL'
+  elif 'Dutch' in row['sourceLanguage'] and 'French' in row['targetLanguage']:
+    return 'NL-FR'
+  else:
+    return f'Unknown: {row["sourceLanguage"]} - {row["targetLanguage"]}'
 
 # -----------------------------------------------------------------------------
 def replaceImprint(row, imprintIDColumn, mainIDColumn, replaceColumn, keepColumn, exceptions):
