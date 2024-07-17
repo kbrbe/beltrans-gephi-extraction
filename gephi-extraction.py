@@ -42,7 +42,7 @@ def main():
   imprintMapping = dfOrgs[['contributorID', 'isImprintFrom']].copy()
 
   # create edge list with information from the nodes (needed for correct mapping of imprints)
-  # we first have to create edges, because based on them we have to filter nodes afterwards
+  # we first have to create edges, because based on them we have to filter nodes afterwards and add aggregated numbers
   edgeDf = createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions)
 
   # no imprintMapping needed for the following function, because the mapping information is already in dfOrgs
@@ -59,8 +59,25 @@ def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, im
   # We have to use the operator '|' instead of 'or', because the latter is for boolean operations in Pandas
   relevantNodesDf = dfOrgs.loc[ (dfOrgs['contributorID'].isin(edgeDf['Source'])) | (dfOrgs['contributorID'].isin(edgeDf['Target'])), columnsToKeep]
 
+
   # default Gephi column names for node ID and label https://github.com/kbrbe/beltrans-gephi-extraction/issues/5
   relevantNodesDf.rename(columns={'contributorID': 'Id', 'name': 'Label'}, inplace=True)
+
+  # empty countries instead of NaN
+  relevantNodesDf = relevantNodesDf.fillna('')
+
+  # add counts of edge attributes for nodes https://github.com/kbrbe/beltrans-gephi-extraction/issues/4
+  # first count
+  flowCountsSource = countTranslationFlow(edgeDf, 'Source')
+  flowCountsTarget = countTranslationFlow(edgeDf, 'Target')
+
+  # then merge the counts to the nodes dataframe and make sure the numbers are integer
+  relevantNodesDf = relevantNodesDf.merge(flowCountsSource, left_on='Id', right_index=True, how='left').fillna(0)
+  relevantNodesDf = relevantNodesDf.merge(flowCountsTarget, left_on='Id', right_index=True, how='left').fillna(0)
+  columnsToConvert = [col for col in relevantNodesDf.columns if col.startswith(('Source', 'Target'))]
+  relevantNodesDf[columnsToConvert] = relevantNodesDf[columnsToConvert].astype(int)
+
+  # Create output file
   relevantNodesDf.to_csv(nodeListFilename, index=False)
 
   # for now the country of the publisher record (not always filled in)
@@ -71,6 +88,14 @@ def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, im
   # and add it
   # is this what we want? Like this we might get wrong country information, especially for translations with multiple publishers and thus publishing places
     
+# -----------------------------------------------------------------------------
+def countTranslationFlow(edgeDf, columnName):
+
+  flowCounts = edgeDf.groupby([columnName, 'translationFlow']).size().unstack(fill_value=0).astype(int)
+  flowCounts = flowCounts.reindex(columns=['FR-NL', 'NL-FR'], fill_value=0).astype(int)
+  flowCounts.columns = [f'{columnName}_FR-NL', f'{columnName}_NL-FR']
+  return flowCounts.astype(int)
+  
 # -----------------------------------------------------------------------------
 def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions):
 
