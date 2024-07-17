@@ -25,6 +25,7 @@ pip -r requirements.txt
 * `minYear`  and `maxYear`: values used to filter publications of the input data
 * `considerImprintRelation`: `True` or `False`, indicating if indicated publishers (imprints) are used as nodes or if they should be replaced with their main publisher as indicated in the `isImprintOf` column
 * `imprintMappingExceptions`: identifiers of imprints that should not be replaced with their main publisher
+* `namesInsteadOfIdentifiers`: use the name of nodes as identifier (both in nodes and in edges), if duplicate names are found a warning is printed
 
 > [!NOTE]
 > Please note that normally such things are down via command line parameters or a config file.

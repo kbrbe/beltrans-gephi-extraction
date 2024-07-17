@@ -30,6 +30,10 @@ def main():
     '9e29c2cd-b380-49e3-82d6-141914ff35c0' # pastel
   ]
 
+  # use names instead of identifiers for nodes and edges (if there are no duplicates)
+  # a warning is printed when duplicate names are encountered
+  namesInsteadOfIdentifiers = True
+
   # Begin of the code
   #
   print(f'read translations from Excel...')
@@ -43,14 +47,44 @@ def main():
 
   # create edge list with information from the nodes (needed for correct mapping of imprints)
   # we first have to create edges, because based on them we have to filter nodes afterwards and add aggregated numbers
-  edgeDf = createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions)
+  edgeDf = createEdgeList(dfTranslations, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions)
 
   # no imprintMapping needed for the following function, because the mapping information is already in dfOrgs
-  createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, imprintMappingExceptions)
+  nodesDf = createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExceptions)
+
+  if namesInsteadOfIdentifiers:
+    # https://github.com/kbrbe/beltrans-gephi-extraction/issues/1
+    replaceIdentifiersIfPossible(edgeDf, nodesDf)
+
+  edgeDf.to_csv(edgeListFilename, index=False)
+  nodesDf.to_csv(nodeListFilename, index=False)
+
+# -----------------------------------------------------------------------------
+def replaceIdentifiersIfPossible(edgeDf, nodesDf):
+
+  # replace identifiers with names https://github.com/kbrbe/beltrans-gephi-extraction/issues/1
+  # but only if names are unique in the current data
+  numberDuplicateNames = nodesDf['Label'].duplicated().sum()
+  if numberDuplicateNames > 0:
+    print(f'node identifiers NOT replaced with names, because names were found not to be unique')
+    print(f'Number of duplicate names: {numberDuplicateNames}')
+    names = nodesDf['Label']
+    print(relevantNodesDf[names.isin(names[names.duplicated()])])
+  else:
+    # replace Id with Label for edges
+    nodeMapping = nodesDf[['Id', 'Label']]
+    nodeMappingDict = nodeMapping.set_index('Id')['Label'].to_dict()
+
+    edgeDf['Source'] = edgeDf['Source'].map(nodeMappingDict)
+    edgeDf['Target'] = edgeDf['Target'].map(nodeMappingDict)
+
+    # replace Id with Label for nodes
+    nodesDf['Id'] = nodesDf['Label']
+
 
 
 # -----------------------------------------------------------------------------
-def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, imprintMappingExceptions):
+def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExceptions):
 
   columnsToKeep = ['contributorID', 'name', 'country']
 
@@ -77,8 +111,8 @@ def createNodeList(dfOrgs, edgeDf, nodeListFilename, considerImprintRelation, im
   columnsToConvert = [col for col in relevantNodesDf.columns if col.startswith(('Source', 'Target'))]
   relevantNodesDf[columnsToConvert] = relevantNodesDf[columnsToConvert].astype(int)
 
-  # Create output file
-  relevantNodesDf.to_csv(nodeListFilename, index=False)
+
+  return relevantNodesDf
 
   # for now the country of the publisher record (not always filled in)
   #
@@ -97,7 +131,7 @@ def countTranslationFlow(edgeDf, columnName):
   return flowCounts.astype(int)
   
 # -----------------------------------------------------------------------------
-def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions):
+def createEdgeList(dfTranslations, genrePrefixes, minYear, maxYear, considerImprintRelation, imprintMapping, imprintMappingExceptions):
 
 
   sourceTargetColumns = ['sourcePublisherIdentifiers', 'targetPublisherIdentifiers']
@@ -146,7 +180,6 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
   # default Gephi column names for source and target https://github.com/kbrbe/beltrans-gephi-extraction/issues/5
   outputEdgeDf.rename(columns={'sourceID': 'Source', 'targetID': 'Target'}, inplace=True)
   outputEdgeDf['Type'] = 'directed'
-  outputEdgeDf.to_csv(edgeListFilename, index=False)
 
   return outputEdgeDf
 
