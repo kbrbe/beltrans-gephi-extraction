@@ -1,3 +1,10 @@
+# Input and output data
+*.xlsx
+*.csv
+
+# python environment
+py-gephi-extraction-env/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
