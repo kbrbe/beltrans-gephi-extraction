@@ -102,7 +102,14 @@ def createEdgeList(dfTranslations, edgeListFilename, genrePrefixes, minYear, max
 
   edgeDf = edgeDf.fillna('')
   edgeDf['targetYearOfPublication'] = edgeDf['targetYearOfPublication'].astype(int)
-  edgeDf.loc[(edgeDf['sourceID'] != '') & (edgeDf['targetID'] != ''),['sourceID','targetID'] + additionalInfoColumns].to_csv(edgeListFilename, index=False)
+
+  # Ensure we only write "real" edges to the output: edges with target AND source
+  outputEdgeDf = edgeDf.loc[(edgeDf['sourceID'] != '') & (edgeDf['targetID'] != ''),['sourceID','targetID'] + additionalInfoColumns]
+
+  # default Gephi column names for source and target https://github.com/kbrbe/beltrans-gephi-extraction/issues/5
+  outputEdgeDf.rename(columns={'sourceID': 'Source', 'targetID': 'Target'}, inplace=True)
+  outputEdgeDf['Type'] = 'directed'
+  outputEdgeDf.to_csv(edgeListFilename, index=False)
 
 
 # -----------------------------------------------------------------------------
