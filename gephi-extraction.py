@@ -32,7 +32,7 @@ def main():
 
   # use names instead of identifiers for nodes and edges (if there are no duplicates)
   # a warning is printed when duplicate names are encountered
-  namesInsteadOfIdentifiers = True
+  namesInsteadOfIdentifiers = False
 
   # Begin of the code
   #
@@ -111,6 +111,7 @@ def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExcept
   columnsToConvert = [col for col in relevantNodesDf.columns if col.startswith(('Source', 'Target'))]
   relevantNodesDf[columnsToConvert] = relevantNodesDf[columnsToConvert].astype(int)
 
+  relevantNodesDf[['mostCommonPlaceOfPublication', 'mostCommonCountryOfPublicationTarget', 'placesOfPublication', 'countriesOfPublication']] = relevantNodesDf.apply(countPlacesOfPublication, edgeDf=edgeDf, axis=1)
 
   return relevantNodesDf
 
@@ -122,6 +123,32 @@ def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExcept
   # and add it
   # is this what we want? Like this we might get wrong country information, especially for translations with multiple publishers and thus publishing places
     
+# -----------------------------------------------------------------------------
+def countPlacesOfPublication(row, edgeDf):
+
+  locationColumns = ['targetPlaceOfPublication', 'targetCountryOfPublication']
+  rowID = row['Id']
+
+  #
+  # get place and country edge values for current node (publisher) in the edges dataframe
+  #
+  locationInfoDf = edgeDf.loc[ (edgeDf['Source'] == rowID) | (edgeDf['Target'] == rowID), locationColumns]
+  for col in locationColumns:
+    locationInfoDf[col] = locationInfoDf[col].str.split(';')
+
+  placesExplodedDf = locationInfoDf.explode(locationColumns[0])[locationColumns[0]]
+  countriesExplodedDf = locationInfoDf.explode(locationColumns[1])[locationColumns[1]]
+
+  # mode wil return the most frequent element in the series (https://stackoverflow.com/questions/48590268)
+  retVal = [
+    placesExplodedDf.mode().tolist()[0], 
+    countriesExplodedDf.mode().tolist()[0], 
+    ';'.join(placesExplodedDf), 
+    ';'.join(countriesExplodedDf)
+  ]
+
+  return pd.Series(retVal)
+
 # -----------------------------------------------------------------------------
 def countTranslationFlow(edgeDf, columnName):
 
@@ -136,12 +163,16 @@ def createEdgeList(dfTranslations, genrePrefixes, minYear, maxYear, considerImpr
 
   sourceTargetColumns = ['sourcePublisherIdentifiers', 'targetPublisherIdentifiers']
   genreColumn = 'targetThesaurusBB'
-  additionalInfoColumns = ['targetYearOfPublication', 'sourceLanguage', 'targetLanguage']
+  additionalInfoColumns = ['targetYearOfPublication', 'sourceLanguage', 'targetLanguage', 'targetPlaceOfPublication', 'targetCountryOfPublication']
 
 
   # We want one row = one source-target relation
-  edgeDfExploded = dfTranslations.explode(sourceTargetColumns).reset_index().copy()
+  # thus first make an array based on the string lists and then explode
+  for col in sourceTargetColumns: 
+    dfTranslations[col] = dfTranslations[col].str.split(';')
 
+  edgeDfExploded = dfTranslations.explode(sourceTargetColumns[0]).explode(sourceTargetColumns[1]).reset_index().copy()
+ 
   # We also only want a subset of the columns
   edgeDfExploded = edgeDfExploded.fillna('')
   edgeDf = edgeDfExploded.loc[edgeDfExploded[genreColumn].str.contains(genrePrefixes), sourceTargetColumns + additionalInfoColumns]
