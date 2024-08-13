@@ -133,18 +133,22 @@ def countPlacesOfPublication(row, edgeDf):
   # get place and country edge values for current node (publisher) in the edges dataframe
   #
   locationInfoDf = edgeDf.loc[ (edgeDf['Source'] == rowID) | (edgeDf['Target'] == rowID), locationColumns]
-  for col in locationColumns:
-    locationInfoDf[col] = locationInfoDf[col].str.split(';')
 
-  placesExplodedDf = locationInfoDf.explode(locationColumns[0])[locationColumns[0]]
-  countriesExplodedDf = locationInfoDf.explode(locationColumns[1])[locationColumns[1]]
+  # We don't assume that the column values are sorted, thus sort separated string, for example "Paris;Brussels" => "Brussels;Paris"
+  for col in locationColumns:
+    locationInfoDf[col] = locationInfoDf[col].apply(lambda val: ';'.join(sorted(val.split(';'))))
+
+  # We need the combination of values, not the exploded components (https://github.com/kbrbe/beltrans-gephi-extraction/issues/7#issuecomment-2285676618)
+  # For example "Brussels;Paris" and not "Brussels" and "Paris"
+  places = locationInfoDf[locationColumns[0]]
+  countries = locationInfoDf[locationColumns[1]]
 
   # mode wil return the most frequent element in the series (https://stackoverflow.com/questions/48590268)
   retVal = [
-    placesExplodedDf.mode().tolist()[0], 
-    countriesExplodedDf.mode().tolist()[0], 
-    ';'.join(placesExplodedDf), 
-    ';'.join(countriesExplodedDf)
+    places.mode().tolist()[0], 
+    countries.mode().tolist()[0], 
+    ';'.join(places), 
+    ';'.join(countries)
   ]
 
   return pd.Series(retVal)
