@@ -125,6 +125,7 @@ def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExcept
     
 # -----------------------------------------------------------------------------
 def countPlacesOfPublication(row, edgeDf):
+  """This function returns a series with 4 values. It is used to populate 4 columns in the output dataframe."""
 
   locationColumns = ['targetPlaceOfPublication', 'targetCountryOfPublication']
   rowID = row['Id']
@@ -143,12 +144,19 @@ def countPlacesOfPublication(row, edgeDf):
   places = locationInfoDf[locationColumns[0]]
   countries = locationInfoDf[locationColumns[1]]
 
+  # Count occurrences of combinations (https://github.com/kbrbe/beltrans-gephi-extraction/issues/7#issuecomment-2285719024)
+  #
+  placeCountsSeries = locationInfoDf[locationColumns[0]].value_counts()
+  placeCountsString = ','.join([f'{place} ({count})' for place, count in placeCountsSeries.items()])
+  countryCountsSeries = locationInfoDf[locationColumns[1]].value_counts()
+  countryCountsString = ','.join([f'{country} ({count})' for country, count in countryCountsSeries.items()])
+
   # mode wil return the most frequent element in the series (https://stackoverflow.com/questions/48590268)
   retVal = [
     places.mode().tolist()[0], 
     countries.mode().tolist()[0], 
-    ';'.join(places), 
-    ';'.join(countries)
+    placeCountsString, 
+    countryCountsString
   ]
 
   return pd.Series(retVal)
