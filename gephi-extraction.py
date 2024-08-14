@@ -11,10 +11,10 @@ def main():
   # all beltrans genre prefixes "81|83|84|85|86|900|92|93|95|96|97"
 
   # Select which genre filter should be used (comment the others with a leading #)
-  genrePrefixes = "84|900|92|93|95|96|97" # history
+  #genrePrefixes = "84|900|92|93|95|96|97" # history
   #genrePrefixes = "85" # Comics
   #genrePrefixes = "81" # Poetry
-  #genrePrefixes = "86" # juvenile literature
+  genrePrefixes = "86" # juvenile literature
   #genrePrefixes = "83|84" # novels
 
   minYear = pd.to_numeric('1970')
@@ -111,7 +111,8 @@ def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExcept
   columnsToConvert = [col for col in relevantNodesDf.columns if col.startswith(('Source', 'Target'))]
   relevantNodesDf[columnsToConvert] = relevantNodesDf[columnsToConvert].astype(int)
 
-  relevantNodesDf[['mostCommonPlaceOfPublication', 'mostCommonCountryOfPublicationTarget', 'placesOfPublication', 'countriesOfPublication']] = relevantNodesDf.apply(countPlacesOfPublication, edgeDf=edgeDf, axis=1)
+  relevantNodesDf[['mostCommonPlaceOfPublicationTarget', 'mostCommonCountryOfPublicationTarget', 'placesOfPublicationTarget', 'countriesOfPublicationTarget']] = relevantNodesDf.apply(countPlacesOfPublication, edgeDf=edgeDf, locationColumns=['targetPlaceOfPublication', 'targetCountryOfPublication'], locationOf='Target', axis=1)
+  relevantNodesDf[['mostCommonPlaceOfPublicationSource', 'mostCommonCountryOfPublicationSource', 'placesOfPublicationSource', 'countriesOfPublicationSource']] = relevantNodesDf.apply(countPlacesOfPublication, edgeDf=edgeDf, locationColumns=['sourcePlaceOfPublication', 'sourceCountryOfPublication'], locationOf='Source', axis=1)
 
   return relevantNodesDf
 
@@ -124,16 +125,19 @@ def createNodeList(dfOrgs, edgeDf, considerImprintRelation, imprintMappingExcept
   # is this what we want? Like this we might get wrong country information, especially for translations with multiple publishers and thus publishing places
     
 # -----------------------------------------------------------------------------
-def countPlacesOfPublication(row, edgeDf):
+def countPlacesOfPublication(row, edgeDf, locationColumns, locationOf):
   """This function returns a series with 4 values. It is used to populate 4 columns in the output dataframe."""
 
-  locationColumns = ['targetPlaceOfPublication', 'targetCountryOfPublication']
   rowID = row['Id']
 
   #
   # get place and country edge values for current node (publisher) in the edges dataframe
+  # only take location information from where the current node is the TARGET publisher
   #
-  locationInfoDf = edgeDf.loc[ (edgeDf['Source'] == rowID) | (edgeDf['Target'] == rowID), locationColumns]
+  locationInfoDf = edgeDf.loc[ (edgeDf[locationOf] == rowID), locationColumns]
+
+  if locationInfoDf.empty:
+    return pd.Series(['','','',''])
 
   # We don't assume that the column values are sorted, thus sort separated string, for example "Paris;Brussels" => "Brussels;Paris"
   for col in locationColumns:
@@ -175,7 +179,8 @@ def createEdgeList(dfTranslations, genrePrefixes, minYear, maxYear, considerImpr
 
   sourceTargetColumns = ['sourcePublisherIdentifiers', 'targetPublisherIdentifiers']
   genreColumn = 'targetThesaurusBB'
-  additionalInfoColumns = ['targetYearOfPublication', 'sourceLanguage', 'targetLanguage', 'targetPlaceOfPublication', 'targetCountryOfPublication']
+  additionalInfoColumns = ['targetYearOfPublication', 'sourceLanguage', 'targetLanguage', 
+                           'sourcePlaceOfPublication', 'sourceCountryOfPublication', 'targetPlaceOfPublication', 'targetCountryOfPublication']
 
 
   # We want one row = one source-target relation
